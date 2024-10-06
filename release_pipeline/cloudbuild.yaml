@@ -1,0 +1,100 @@
+# Terraform docker version: https://hub.docker.com/r/hashicorp/terraform/tags
+substitutions:
+  _TERRAFORM_VERSION: 1.9.6
+  _GCP_PKG_REPO: 'asia-northeast1-docker.pkg.dev'
+  # We could use the $REPO_NAME here but we can only build in global
+  # with a free account and our repo is in the asia-northeast1 region
+
+logsBucket: 'gs://cloudbuild-logs-${PROJECT_ID}'
+
+steps:
+  # Build the core image
+  - name: 'gcr.io/cloud-builders/docker'
+    id: build-core-image
+    args:
+      - 'build'
+      - '--tag=${_GCP_PKG_REPO}/$PROJECT_ID/saleor-repo/saleor-core:latest'
+      - '--tag=${_GCP_PKG_REPO}/$PROJECT_ID/saleor-repo/saleor-core:$SHORT_SHA'
+      - '--file=./saleor/core/Dockerfile'
+      - './saleor/core/'
+    waitFor: ['-']
+
+  # Build the dashboard image
+  - name: 'gcr.io/cloud-builders/docker'
+    id: build-dashboard-image
+    args:
+      - 'build'
+      - '--tag=${_GCP_PKG_REPO}/$PROJECT_ID/saleor-repo/saleor-dashboard:latest'
+      - '--tag=${_GCP_PKG_REPO}/$PROJECT_ID/saleor-repo/saleor-dashboard:$SHORT_SHA'
+      - '--file=./saleor/dashboard/Dockerfile'
+      - './saleor/dashboard/'
+    waitFor: ['-']
+
+  # Grab the tf-deploy-sa service account from Secret Manager
+  - name: 'gcr.io/cloud-builders/gcloud'
+    id: 'pull-deployer-account'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        gcloud secrets versions access latest --secret="tf-deploy-sa" > /workspace/service-account-key.json
+    waitFor: ['-']
+
+  # Replace TERRAFORM_BUCKET_NAME with valid bucket
+  - name: 'alpine:latest'
+    id: 'replace-terraform-bucket-name'
+    entrypoint: 'sh'
+    args:
+      - '-c'
+      - |
+        sed -i "s/TERRAFORM_BUCKET_NAME/terraform-${PROJECT_ID}/g" release_pipeline/terraform/main.tf
+    waitFor: ['-']
+
+  # Init Terraform
+  - name: 'hashicorp/terraform:${_TERRAFORM_VERSION}'
+    id: 'terraform-init'
+    dir: 'release_pipeline/terraform'
+    args:
+    - 'init'
+    waitFor: ['replace-terraform-bucket-name']
+
+  # Push the jobs image to Artifact Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    id: push-core-image
+    args:
+      - 'push'
+      - '-a'
+      - '${_GCP_PKG_REPO}/$PROJECT_ID/saleor-repo/saleor-core'
+    waitFor: ['build-core-image']
+
+  # Push the jobs image to Artifact Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    id: push-dashboard-image
+    args:
+      - 'push'
+      - '-a'
+      - '${_GCP_PKG_REPO}/$PROJECT_ID/saleor-repo/saleor-dashboard'
+    waitFor: ['build-dashboard-image']
+
+  # Run tests
+
+  # Auto deploy
+  - name: 'hashicorp/terraform:${_TERRAFORM_VERSION}'
+    id: 'apply-terraform'
+    dir: 'release_pipeline/terraform'
+    entrypoint: 'sh'
+    args:
+    - '-c'
+    - |
+      terraform apply \
+      '-lock=true' \
+      '-auto-approve' \
+      '-var-file=./props.tfvar' \
+      '-var=gcp_creds=/workspace/service-account-key.json' \
+      '-var=gcp_project=$PROJECT_ID' \
+      '-var=image_tag=latest'
+    waitFor:
+    - 'pull-deployer-account'
+    - 'terraform-init'
+    - 'push-core-image'
+    - 'push-dashboard-image'

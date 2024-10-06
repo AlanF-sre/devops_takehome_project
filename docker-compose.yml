@@ -1,0 +1,42 @@
+services:
+  api:
+    build:
+      context: ./saleor/core/
+    ports:
+      - 8000:8000
+    restart: unless-stopped
+    networks:
+      - saleor-backend-tier
+    stdin_open: true
+    tty: true
+    depends_on:
+      - redis
+    volumes:
+      - ./saleor/core/saleor/static/placeholders:/app/media/products
+    environment:
+      - DATABASE_URL=postgres://saleor_user:ONWKiCecmCyInUU@34.84.232.198:5432/saleor
+
+  dashboard:
+    build:
+      context: ./saleor/dashboard/
+    ports:
+      - 9000:80
+    restart: unless-stopped
+
+  redis:
+    image: library/redis:7.0-alpine
+    ports:
+      - 6379:6379
+    restart: unless-stopped
+    networks:
+      - saleor-backend-tier
+    volumes:
+      - saleor-redis:/data
+
+volumes:
+  saleor-redis:
+    driver: local
+
+networks:
+  saleor-backend-tier:
+    driver: bridge
