@@ -19,6 +19,8 @@ The project is currently structured for one environment but it would need expand
 
 Due to this being a restricted account (free), cloud builds only work in specific regions.
 
+Since I'd like to re-purpose some of this project to be open to the public, I've chosen to go with Cloud Build rather than GitHub Actions. This keeps as much of the ecosystem for this process in GCP as possible.
+
 # Architecture
 ![Architecture](architecture.drawio.png "Architecture")
 
