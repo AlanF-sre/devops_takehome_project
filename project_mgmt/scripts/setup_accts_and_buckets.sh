@@ -3,6 +3,7 @@
 gcp_project=$(gcloud config get-value project)
 tf_bucket_name="terraform-$gcp_project"
 
+# Enable required project services
 gcloud services enable compute.googleapis.com
 gcloud services enable iam.googleapis.com
 gcloud services enable iamcredentials.googleapis.com
@@ -14,6 +15,7 @@ gcloud services enable container.googleapis.com
 gcloud services enable cloudresourcemanager.googleapis.com
 gcloud services enable servicenetworking.googleapis.com
 
+# Create terraform-creator-sa and grant permissions
 gcloud iam service-accounts create terraform-creator-sa \
   --description="Service Account for setting up project via Terraform" \
   --display-name="Terraform Creator Service Account"

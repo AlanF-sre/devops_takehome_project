@@ -1,5 +1,7 @@
 #/bin/bash
 
+# CAUTION: This will change the primary password that the cluster uses
+
 # Function to display usage
 usage() {
     echo "Usage: $0 -i <db_instance> -d <database>"

@@ -32,13 +32,14 @@ if [[ -d "$database" || -z "$db_instance" ]]; then
     usage
 fi
 
+# TODO: Wrap the following commands in conditionals to make script idempotent
 # Reset DB User"s password and drop all owned data
 gcloud sql databases delete $database --instance=$db_instance --quiet
 
-# Create service account key for deployer
+# Create service account key for creator
 gcloud iam service-accounts keys create terraform-creator-key.json --iam-account $tf_creator_sa
 
-# Create service account key for creator
+# Create service account key for deployer
 gcloud iam service-accounts keys create release_pipeline/terraform/tf-deployer-service-acct-key.json \
   --iam-account tf-deployer-service-acct@$my_project.iam.gserviceaccount.com
 
